@@ -1,0 +1,61 @@
+name: SonarQube Analysis + Debugging
+on: workflow_dispatch
+jobs:
+  sonarqube:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Required for SonarQube analysis
+          
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Run tests with coverage
+        run: npm test -- --coverage --watchAll=false
+        # If using Jest, this creates coverage/lcov.info
+        # Adjust based on your test framework
+        
+      - name: Verify coverage file exists
+        run: |
+          echo "Checking coverage file..."
+          find . -name "lcov.info" -o -name "coverage-final.json" || echo "No coverage files found"
+          # If file exists, show location
+          if [ -f "coverage/lcov.info" ]; then
+            echo "✓ Coverage file found at coverage/lcov.info"
+          else
+            echo "⚠ Coverage file not found at expected location"
+          fi
+        
+      - name: Install SonarQube Scanner
+        run: |
+          npm install -g sonarqube-scanner
+          npx sonarqube-scanner --version
+          
+      - name: Run SonarQube Analysis
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          # Get GITHUB_TOKEN automatically
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Starting SonarQube Analysis ==="
+          echo "Project Key: my-organization_my-repo-name"
+          echo "Organization: my-github-organization-name"
+          echo "Host URL: https://sonarcloud.io"
+          
+          # OPTION A: Pass all parameters in command line
+          npx sonarqube-scanner \
+            -Dsonar.projectKey=my-organization_my-repo-name \
+            -Dsonar.organization=my-github-organization-name \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            
+          # If Option A doesn't work, try Option B below
